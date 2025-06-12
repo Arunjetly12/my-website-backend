@@ -5,16 +5,35 @@ const express = require('express');
 const pool = require('./db');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
-const jwt = require('jsonwebtoken'); // <-- 1. IMPORT JWT LIBRARY
+const jwt = require('jsonwebtoken');
 const auth = require('./auth'); 
 
 // ====== SETUP ======
 const app = express();
-const port = 3000;
+// Use the PORT environment variable Render provides, or 3000 for local development
+const port = process.env.PORT || 3000;
 
 // ====== MIDDLEWARE ======
-app.use(cors());
+
+// --- NEW: PRODUCTION CORS CONFIGURATION ---
+// This tells our backend which specific frontend URL is allowed to make requests.
+const allowedOrigins ='https://versa-pdfs.vercel.app/'; // <-- PASTE YOUR VERCEL URL HERE
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
 
 // ====== ROUTES ======
 
@@ -22,7 +41,7 @@ app.get('/', (req, res) => {
   res.send('Backend server is alive! Endpoints: POST /api/signup, POST /api/login');
 });
 
-// --- SIGNUP ROUTE (Unchanged) ---
+// --- SIGNUP ROUTE ---
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -63,70 +82,44 @@ app.post('/api/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-
-    // 2. --- CREATE THE JWT PAYLOAD ---
-    // The "payload" is the information we want to embed in the token.
-    // We only need the user's unique ID to identify them in future requests.
-    const payload = {
-      user: {
-        id: user.id
-      }
-    };
-
-    // 3. --- SIGN AND SEND THE TOKEN ---
-    // This creates the token and sends it back to the user.
-    // In a real production app, this 'secretKey' should be a long, complex string
-    // stored securely in an environment variable file (.env), not in the code.
-    const secretKey = 'mySuperSecretKey123!';
+    const payload = { user: { id: user.id } };
+    
+    // In production, get the secret from an environment variable for better security
+    const secretKey = process.env.JWT_SECRET || 'mySuperSecretKey123!';
 
     jwt.sign(
       payload,
       secretKey,
-      { expiresIn: '1h' }, // Token is valid for 1 hour
+      { expiresIn: '1h' },
       (err, token) => {
         if (err) throw err;
-        // The response now includes the token
-        res.status(200).json({
-          message: "Login successful!",
-          token: token // This is the user's "wristband"
-        });
+        res.status(200).json({ message: "Login successful!", token: token });
       }
     );
-
   } catch (err) {
     console.error("Error in /api/login:", err.message);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
 
-// --- NEW: PROTECTED DASHBOARD DATA ROUTE ---
-// Notice we put `auth` right after the path. This means our "bouncer"
-// will run before the main route logic.
+
+// --- PROTECTED DASHBOARD DATA ROUTE ---
 app.get('/api/dashboard', auth, async (req, res) => {
   try {
-    // The `auth` middleware added `req.user` for us. It contains the user's id.
     const userId = req.user.id;
-
-    // Fetch user details from the database, but NEVER the password hash.
-    const user = await pool.query(
-      "SELECT id, username, email FROM users WHERE id = $1",
-      [userId]
-    );
-
+    const user = await pool.query("SELECT id, username, email FROM users WHERE id = $1", [userId]);
     if (user.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
     }
-
-    // Send the user's data back to the frontend
     res.json(user.rows[0]);
-
   } catch (err) {
     console.error("Error in /api/dashboard:", err.message);
     res.status(500).send("Server Error");
   }
 });
 
+
 // ====== START SERVER ======
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(Server is running on port ${port}); // <-- BROKEN LINE
 });
