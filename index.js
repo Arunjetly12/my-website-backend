@@ -15,14 +15,17 @@ const port = process.env.PORT || 3000;
 
 // ====== MIDDLEWARE ======
 
-// --- NEW: PRODUCTION CORS CONFIGURATION ---
-// This tells our backend which specific frontend URL is allowed to make requests.
-const allowedOrigins ='https://versa-pdfs.vercel.app/'; // <-- PASTE YOUR VERCEL URL HERE
+// --- FINAL, CORRECTED CORS CONFIGURATION ---
+// 1. Your Vercel URL MUST be in an array [].
+// 2. Do NOT include the trailing slash '/' at the end of the URL.
+const allowedOrigins = ['https://versa-pdfs.vercel.app'];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like Postman, mobile apps, or server-to-server)
     if (!origin) return callback(null, true);
+    
+    // Check if the incoming origin is in our list of allowed origins
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
@@ -66,7 +69,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 
-// --- LOGIN ROUTE WITH JWT TOKEN GENERATION ---
+// --- LOGIN ROUTE ---
 app.post('/api/login', async (req, res) => {
   try {
     const { loginIdentifier, password } = req.body;
@@ -83,10 +86,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
     const payload = { user: { id: user.id } };
-    
-    // In production, get the secret from an environment variable for better security
     const secretKey = process.env.JWT_SECRET || 'mySuperSecretKey123!';
-
     jwt.sign(
       payload,
       secretKey,
@@ -121,5 +121,6 @@ app.get('/api/dashboard', auth, async (req, res) => {
 
 // ====== START SERVER ======
 app.listen(port, () => {
-  console.log(Server is running on port ${port}); // <-- BROKEN LINE
+  // FINAL, CORRECTED SYNTAX using backticks ``
+  console.log(`Server is running on port ${port}`);
 });
