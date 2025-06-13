@@ -1,22 +1,27 @@
+// === index.js (FINAL & BULLETPROOFED) ===
+// The complete, assembled, and working backend server.
+// ====================================================
+
 console.log("--- SERVER STARTING ---");
 
 // ====== IMPORTS ======
+// We bring in all our tools and the modules we created.
 const express = require('express');
-const pool = require('./db');
+const pool = require('./db');      // Our new, bulletproof db connection
+const auth = require('./auth');    // Our new, bulletproof auth "bouncer"
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const auth = require('./auth');
 
 // ====== SETUP ======
 const app = express();
 const port = process.env.PORT || 3000;
 
 // ====== MIDDLEWARE ======
+// This section prepares our server to handle requests.
 
-// --- PRODUCTION CORS CONFIGURATION ---
+// --- Production-Ready CORS Configuration ---
 const allowedOrigins = ['https://versa-pdfs.vercel.app'];
-
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -27,12 +32,18 @@ const corsOptions = {
     return callback(null, true);
   }
 };
-
 app.use(cors(corsOptions));
+
+// --- JSON Body Parser ---
+// This allows our server to read JSON data sent from the frontend.
 app.use(express.json());
 
-// ====== ROUTES ======
 
+// ====== ROUTES ======
+// This is the heart of our API.
+
+// --- Health Check Route ---
+// A simple route to confirm the server is alive.
 app.get('/', (req, res) => {
   res.send('Backend server is alive! Endpoints: POST /api/signup, POST /api/login');
 });
@@ -56,13 +67,12 @@ app.post('/api/signup', async (req, res) => {
     );
     res.status(201).json(newUser.rows[0]);
   } catch (err) {
-    // ✅ IMPROVED LOGGING: Logs the full error, not just the message.
     console.error("Error in /api/signup:", err);
     res.status(500).json({ message: 'Server error during signup' });
   }
 });
 
-// --- FINAL, FIXED LOGIN ROUTE ---
+// --- LOGIN ROUTE ---
 app.post('/api/login', async (req, res) => {
   try {
     const { loginIdentifier, password } = req.body;
@@ -75,8 +85,7 @@ app.post('/api/login', async (req, res) => {
     }
     const user = userResult.rows[0];
 
-    // ✅ THE BUG FIX: We must check if a password hash exists *before* we try to use it.
-    // This prevents a crash if a user in the database was created without a password.
+    // ✅ The crucial bug fix: Always check if the password hash exists before using it.
     if (!user.password_hash) {
       console.error(`CRITICAL: User '${user.username}' (ID: ${user.id}) has no password hash in the database.`);
       return res.status(500).json({ message: "Server configuration error. Please contact support." });
@@ -98,13 +107,13 @@ app.post('/api/login', async (req, res) => {
       }
     );
   } catch (err) {
-    // ✅ IMPROVED LOGGING: Logs the full error for better debugging.
     console.error("Error in /api/login:", err);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
 
 // --- PROTECTED DASHBOARD ROUTE ---
+// Notice how we put our `auth` middleware right here. It runs before the main logic.
 app.get('/api/dashboard', auth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -114,13 +123,15 @@ app.get('/api/dashboard', auth, async (req, res) => {
     }
     res.json(user.rows[0]);
   } catch (err) {
-    // ✅ IMPROVED LOGGING
     console.error("Error in /api/dashboard:", err);
-    res.status(500).send("Server Error");
+    // ✅ Tiny fix for consistency: sending JSON error object.
+    res.status(500).json({ message: "Server Error" });
   }
 });
 
+
 // ====== START SERVER ======
+// The final command that brings our server to life.
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
